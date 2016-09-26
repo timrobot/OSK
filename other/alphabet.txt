@@ -1,0 +1,20 @@
+alphabet = {'a':drawa, 'b':drawb, 'c':drawc}
+def disp(string, pos=(0,0), size=16):
+    for char in string:
+        alphabet[char]((pos[0] + size, pos[1]), size)
+
+def drawa(pos, size):
+    if size == 16:
+        drawImage("a_arial_16.png", pos)
+
+def drawb(pos, size):
+    if size == 16:
+        drawImage("b_arial_16.png", pos)
+
+def drawc(pos, size):
+    if size == 16:
+        drawImage("c_arial_16.png", pos)
+
+
+Example:
+disp("cab")

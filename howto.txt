@@ -1,0 +1,3 @@
+to run, just do:
+
+python game.py
