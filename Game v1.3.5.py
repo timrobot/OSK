@@ -1,7 +1,7 @@
 import pygame
 import sys
 import random
-import math
+from math import *
 
 pygame.init()
 w, h = 720, 528
@@ -24,9 +24,18 @@ def main():
     location = locations[0]
     characters = []
     charToDelete = 0
+    enemies = []
     #sub menu
     sb_selector = 1
     sb_selected = "escape"
+    sb_menuImages = ["ui/menu/sub characters.png", "ui/menu/sub inventory.png", "ui/menu/sub map.png", "ui/menu/sub options.png", "ui/menu/sub return.png"]
+    sb_menuItems = ["Characters", "Inventory", "Map", "Options", "Return"]
+    sb_buttons = []
+    sb_oldPos = (0, 0)
+    sb_mouse = False
+    sb_oldSelector = 1
+    for i in range(len(sb_menuItems)):
+        sb_buttons.append(button((500, 200 + i * 52), sb_menuItems[i], sb_menuImages[i]))
     #action mode
     battle = True
     Prompt = BattlePrompt()
@@ -34,15 +43,15 @@ def main():
     BlueSpartan = cBlueSpartan()
     objectlist = [BlueSpartan]
 
-    """MUSIC"""
+    # MUSIC #
     song.load("media/still alive.mp3")
     song.play(-1)
 
     while True:
-        """RESET"""
-        screen.fill((255, 255, 255))
+        # RESET #
+        screen.fill((0, 0, 255))
 
-        """MAIN MENU"""
+        # MAIN MENU #
         if screenMode == "main menu":
             #user input
             if getKey("enter") or getKey("space"):
@@ -77,14 +86,18 @@ def main():
             else:
                 mm_selected = ""
             #draw
+            menuItems = ["ui/menu/main new game.png", "ui/menu/main load game.png", "ui/menu/main options.png", "ui/menu/main exit.png"]
+            
             drawImage("ui/menu/main menu.png", (0, 0))
-            drawImage("ui/menu/main new game.png", (500, 200))
-            drawImage("ui/menu/main load game.png", (500, 255))
-            drawImage("ui/menu/main options.png", (500, 310))
-            drawImage("ui/menu/main exit.png", (500, 365))
-            drawImage("ui/menu/main selector.png", (460, 145 + mm_selector * 55))
+            drawImage("ui/menu/menu borders.png", (471, 196))
+            for i in range(len(menuItems)):
+                if mm_selector - 1 == i:
+                    drawImage("ui/menu/button selector.png", (500, 148 + mm_selector * 52))
+                else:
+                    drawImage("ui/menu/button background.png", (500, 200 + (i*52)))
+                drawImage(menuItems[i], (500, 200 + (i*52)))
 
-        """ADVENTURE MODE"""
+        # ADVENTURE MODE #
         if screenMode == "adventure mode":
             # <user input> escape sequence
             if getKey("escape"):
@@ -103,6 +116,7 @@ def main():
                 if characters[0].collide(characters[i]):
                     screenMode = "battle mode"
                     charToDelete = i
+                    enemies.append(characters[i])
                     break
                 i -= 1
             # character and location movement (O(4))
@@ -162,6 +176,7 @@ def main():
                 #user prompt
                 if Prompt.ActionMode == "":
                     Prompt.display()
+                    ChainAttack.defense = False
                 if Prompt.ActionMode == "Action":
                     characters[0].Start = "Start" #initiates player movement
                     BlueSpartan.Start = "Nothing"
@@ -172,17 +187,29 @@ def main():
                 #chain attack
                 if characters[0].Start == "Start":
                     ChainAttack.record()
-                if characters[0].Stance == "Ready":
+                if characters[0].Stance == "Ready" or BlueSpartan.Stance == "Ready":
                     ChainAttack.display()
-                if ChainAttack.Success == True:
+                if ChainAttack.defense == True:
+                    if ChainAttack.Success == True:
+                        ChainAttack.reset()
+                        BlueSpartan.Stance = "Retreat"
+                    elif ChainAttack.Success == False:
+                        ChainAttack.reset()
+                        BlueSpartan.Stance = "Attack"
+                else:
+                    if ChainAttack.Success == True:
                         ChainAttack.reset()
                         characters[0].Stance = "Attack"
-                elif ChainAttack.Success == False:
+                    elif ChainAttack.Success == False:
                         ChainAttack.reset()
                         characters[0].Stance = "Retreat"
                 if ChainAttack.anim >= 360:
-                    ChainAttack.reset()
-                    characters[0].Stance = "Retreat"
+                    if ChainAttack.defense == True:
+                        ChainAttack.reset()
+                        ChainAttack.Success = False
+                    else:
+                        ChainAttack.reset()
+                        characters[0].Stance = "Retreat"
                 if characters[0].Stance == "Retreat":
                     ChainAttack.hitrecord = 0
                 #updates health
@@ -197,6 +224,7 @@ def main():
                 if characters[0].Start == "Finish":
                     BlueSpartan.Start = "Start"
                     characters[0].Start = "Nothing"
+                    ChainAttack.defense = True
                 #ends battle mode
                 if characters[0].health <= 0:
                     screenMode = "main menu"
@@ -219,14 +247,15 @@ def main():
                     screenMode = "adventure mode"
                     battle = True
 
-        """SUB MENU"""
-        if screenMode == "sub menu":
+        # SUB MENU #
+        elif screenMode == "sub menu":
             #user input
             if getKey("enter") or getKey("space"):
                 if sb_selected != "enter":
                     if sb_selector == 5:
                         screenMode = "adventure mode"
                         sb_selector = 1
+                        sb_mouse = False
             elif getKey("up") and not getKey("down"):
                 if sb_selected != "up":
                     if sb_selector == 1:
@@ -234,6 +263,7 @@ def main():
                     else:
                         sb_selector -= 1
                     sb_selected = "up"
+                    sb_mouse = False
             elif not getKey("up") and getKey("down"):
                 if sb_selected != "down":
                     if sb_selector == 5:
@@ -241,30 +271,50 @@ def main():
                     else:
                         sb_selector += 1
                     sb_selected = "down"
+                    sb_mouse = False
             elif getKey("escape"):
                 if sb_selected != "escape":
                     screenMode = "adventure mode"
                     sb_selected = "escape"
                     sb_selector = 1
+                    sb_mouse = False
             else:
                 sb_selected = ""
+            if getMousePos() != sb_oldPos:
+                sb_mouse = True
+                sb_oldPos = getMousePos()
+            if sb_mouse:
+                for i in range(len(sb_buttons)):
+                    if sb_buttons[i].mouseOver():
+                        sb_selector = i+1
+                        if sb_buttons[i].mouseClicked():
+                            if i == 4:
+                                screenMode = "adventure mode"
+                                sb_selector = 1
+                                sb_mouse = False
             #draw
-            screen.fill((96, 60, 40))
-            drawImage("ui/menu/sub characters.png", (w-200, 200))
-            drawImage("ui/menu/sub inventory.png", (w-200, 250))
-            drawImage("ui/menu/sub map.png", (w-200, 300))
-            drawImage("ui/menu/sub options.png", (w-200, 350))
-            drawImage("ui/menu/sub return.png", (w-200, 400))
-            drawImage("ui/menu/main selector.png", (w-250, 150 + sb_selector * 50))
+            location.drawUnder(frame)
+            i = len(characters) - 1
+            while i >= 0:
+                characters[i].draw(location.pos)
+                i -= 1
+            location.drawOver(frame)
 
-        """DISPLAY, FRAME, EVENT"""
+            drawImageOpaque("ui/menu/sub background.png", (0, 0), 127)
+            drawImage("ui/menu/menu borders.png", (471, 196))
+            for i in range(len(sb_buttons)):
+                if i == sb_selector - 1:
+                    sb_buttons[i].draw(True)
+                else:
+                    sb_buttons[i].draw(False)
+
+        # DISPLAY, FRAME, EVENT #
         pygame.display.update()
         clock.tick(fps)
         frame += 1
         eventHandler(pygame.event.get())
 
-
-"""@Images and @Keys"""
+#@Images and @Keys#
 
 images = []
 imageNames = []
@@ -281,6 +331,84 @@ def drawImage(imageName, position):
 
 def drawImageOrigin(imageName, position):
     drawImage(imageName, (position[0] + w/2 - 24, position[1] + h/2 - 24))
+
+def drawImageOpaque(imageName, position, opacity):
+    i = 0
+    while i < len(imageNames):
+        if imageNames[i] == imageName:
+            images[i].set_alpha(opacity, pygame.RLEACCEL)
+            screen.blit(images[i], position)
+            return
+        i += 1
+    images.append(pygame.image.load(imageName))
+    imageNames.append(imageName)
+    images[len(images) - 1].set_alpha(opacity, pygame.RLEACCEL)
+    screen.blit(images[len(images) - 1], position)
+
+def drawImageScaled(imageName, position, size):
+    i = 0
+    while i < len(imageNames):
+        if imageNames[i] == imageName:
+            screen.blit(pygame.transform.scale(images[i], size), position)
+            return
+        i += 1
+    images.append(pygame.Surface.convert_alpha(pygame.image.load(imageName)))
+    imageNames.append(imageName)
+    screen.blit(pygame.transform.scale(images[len(images) - 1], size), position)
+
+def drawImageRotated(imageName, centerPos, angle):
+    image = None
+    i = 0
+    while i < len(imageNames):
+        if imageNames[i] == imageName:
+            image = images[i]
+            break
+        i += 1
+    if image == None:
+        images.append(pygame.Surface.convert_alpha(pygame.image.load(imageName)))
+        imageNames.append(imageName)
+        image = images[len(images) - 1]
+    w = image.get_width()
+    h = image.get_height()
+    l = sqrt(w*w + h*h)
+    thetaA = atan(h/w)
+    phiA = thetaA + angle
+    hA = fabs(sin(phiA)*l)
+    wA = fabs(cos(phiA)*l)
+    beta = 90  - angle
+    phiB = thetaA + beta
+    hB = fabs(sin(phiB)*l)
+    wB = fabs(cos(phiB)*l)
+    H = hA
+    if hB > hA:
+        H = hB
+    W = wA
+    if wB > wA:
+        W = wB
+    newPos = (centerPos[0] - H/2, centerPos[1] - W/2)
+    screen.blit(pygame.transform.rotate(image, -angle), newPos)
+
+def drawString(string, pos, font = "agency fb", size = 21, color = (0, 0, 0), space = 2):
+    charShift = 0
+    uppercase = ("A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z")
+    upperwidth = (26, 24, 24, 26, 19, 18, 24, 26, 5, 23, 24, 18, 30, 26, 26, 24, 29, 24, 24, 22, 26, 24, 38, 26, 25, 24)
+    lowercase = ("a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z")
+    lowerheight = (63, 63, 63, 63, 63, 63, 78, 63, 63, 78, 63, 63, 63, 63, 63, 63, 78, 72, 63, 63, 63, 63, 63, 63, 77, 63)
+    lowerwidth = (21, 21, 21, 21, 21, 14, 21, 21, 5, 10, 20, 5, 37, 21, 21, 21, 21, 20, 21, 13, 21, 22, 34, 22, 22, 21)
+    for i in range(len(string)):
+        upper = False
+        for n in range(26):
+            if uppercase[n] == string[i]:
+                upper = True
+                drawImageScaled("font/agency fb/upper/" + string[i] + ".png", (pos[0] + charShift, pos[1]), (int(upperwidth[n] * size / 63), size))
+                charShift += int(upperwidth[n] * size / 63) + space
+                break
+        if not upper:
+            for n in range(len(lowercase)):
+                if lowercase[n] == string[i]:
+                    drawImageScaled("font/agency fb/" + string[i] + ".png", (pos[0] + charShift, pos[1]), (int(lowerwidth[n] * size / 63), int(lowerheight[n] * size / 63)))
+                    charShift += int(lowerwidth[n] * size / 63) + space
+                    break
 
 keyNames = []
 def setKey(keyName, state):
@@ -302,12 +430,33 @@ def getKey(keyName):
         i += 1
     return False
 
+mouseClicked = False
+def setMouseClick(var):
+    global mouseClicked
+    mouseClicked = var
+mousePosition = (0, 0)
+def setMousePos(pos):
+    global mousePosition
+    mousePosition = pos
+def getMouseClick():
+    global mouseClicked
+    return mouseClicked
+def getMousePos():
+    global mousePosition
+    return mousePosition
+
 def eventHandler(eventList):
     try:
         for event in eventList:
             if event.type == pygame.QUIT:
                 pygame.quit()
                 sys.exit()
+            elif event.type == pygame.MOUSEMOTION:
+                setMousePos(event.pos)
+            elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                setMouseClick(True)
+            elif event.type == pygame.MOUSEBUTTONUP and event.button == 1:
+                setMouseClick(False)
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_DOWN:
                     setKey("down", True)
@@ -495,7 +644,39 @@ def rotateImage(Imagename, angle, pos):
     Image = pygame.transform.rotate(pygame.image.load(Imagename), angle)
     screen.blit(Image, pos)
 
-"""@Maps"""
+#@Game#
+class div():
+    pos = (0, 0)
+    size = (0, 0)
+    def __init__(self, size, pos):
+        self.pos = pos
+        self.size = size
+    def mouseOver(self):
+        pos = getMousePos()
+        if pos[0] >= self.pos[0] and pos[0] <= (self.pos[0] + self.size[0]):
+            if pos[1] >= self.pos[1] and pos[1] <= (self.pos[1] + self.size[1]):
+                return True
+        return False
+    def mouseClicked(self):
+        if getMouseClick() and self.mouseOver():
+                return True
+        return False
+
+class button(div):
+    text = ""
+    icon = ""
+    def __init__(self, pos, text, icon):
+        self.text = text
+        self.icon = icon
+        self.size = (175, 50)
+        self.pos = pos
+    def draw(self, highlighted):
+        drawImage("ui/menu/button background.png", self.pos)
+        if highlighted:
+            drawImage("ui/menu/button selector.png", self.pos)
+        drawImage(self.icon, self.pos)
+
+#@Maps#
 
 class npc():
     pos = (0, 0)
@@ -659,7 +840,7 @@ class eElias(npc):
                 self.walking = True
                 self.move()
     def draw(self, pos):
-        if screenMode == "adventure mode":
+        if screenMode == "adventure mode" or screenMode == "sub menu":
             drawImageOrigin(self.adventureImage, (13, 6))
         elif screenMode == "battle mode":
             drawImage(self.Image, (self.x, self.y))
@@ -679,7 +860,7 @@ class eElias(npc):
 
 
 
-    """ ------ BATTLE MODE ------- """
+    # ------ BATTLE MODE ------- #
     
     def bdraw(self):
         if self.Stance == "Idle":
@@ -734,7 +915,7 @@ class eElias(npc):
                 if self.weapon.anim >= 90:
                     self.Stance = "Charge"
 
-    """ ------ BATTLE MODE ------- """
+    # ------ BATTLE MODE ------- #
     
 
 class redSpartan(npc):
@@ -1033,7 +1214,7 @@ class oakForest(area):
                 x += 1
             y += 1
 
-"""@BATTLE MODE"""
+#@BATTLE MODE#
 PI = 3.14159265359
 def drawRadial(color, pos, radius, deg):
     radius = float(radius)
@@ -1041,7 +1222,7 @@ def drawRadial(color, pos, radius, deg):
     parts = deg * circumference / 360
     part = float(0)
     while part < parts:
-        pygame.draw.line(screen, color, (pos[0], pos[1]), (pos[0] + int(math.sin(part / radius) * radius), pos[1] + int(-math.cos(part / radius) * radius)), 3)
+        pygame.draw.line(screen, color, (pos[0], pos[1]), (pos[0] + int(sin(part / radius) * radius), pos[1] + int(-cos(part / radius) * radius)), 3)
         part += 1
 
 class BattlePrompt():
@@ -1106,6 +1287,7 @@ class dChainAttack():
     Imagehit = "ui/battle mode/hitrecord.png"
     anim = 0
     randindct = 0
+    defense = False
     def reset(self):
         self.anim = 0
         self.Success = ""
@@ -1141,18 +1323,23 @@ class dChainAttack():
             drawImage(self.Imagehit, (self.recordx + (self.spacingx * 0), self.recordy + (self.spacingy * 2)))
     def display(self):
         self.anim += 6
+        #generates random integer based on number of successful hits already made
         if self.anim == 6:
-            if self.hitrecord >= 1 and self.hitrecord <= 3:
-                self.randindct = random.randint(4,7)
-            elif self.hitrecord >= 4 and self.hitrecord <= 7:
-                self.randindct = random.randint(3,7)
-            elif self.hitrecord >= 8 and self.hitrecord <= 11:
-                self.randindct = random.randint(2,5)
-            elif self.hitrecord >= 12:
-                self.randindct = random.randint(1,3)
-            else: 
-                self.randindct = random.randint(6,8)
+            if self.defense == True:
+                self.randindct = random.randint(1,8)
+            elif self.defense == False:
+                if self.hitrecord >= 1 and self.hitrecord <= 3:
+                    self.randindct = random.randint(4,7)
+                elif self.hitrecord >= 4 and self.hitrecord <= 7:
+                    self.randindct = random.randint(3,7)
+                elif self.hitrecord >= 8 and self.hitrecord <= 11:
+                    self.randindct = random.randint(2,5)
+                elif self.hitrecord >= 12:
+                    self.randindct = random.randint(1,3)
+                else: 
+                    self.randindct = random.randint(6,8)
         drawImage(self.Imagebackground, (self.x, self.y))
+        #displays indicator based on random integer generated
         if self.randindct == 1:
             self.indicator = self.Image1
             self.limit1 = 2
@@ -1186,28 +1373,33 @@ class dChainAttack():
             self.limit1 = 316
             self.limit2 = 358
         drawImage(self.indicator, (self.x, self.y))
-        if self.hitrecord >= 1 and self.hitrecord <= 3:
+        #draws radial (controls radial speed- dependent on number of hits already made)
+        if self.anim <= 359:
+            if self.hitrecord >= 1 and self.hitrecord <= 3:
+                self.anim += 0
+            elif self.hitrecord >= 4 and self.hitrecord <= 7:
+                self.anim += 2
+            elif self.hitrecord >= 8 and self.hitrecord <= 11:
+                self.anim += 4
+            elif self.hitrecord >= 12:
+                self.anim += 6
+            else:
+                if self.defense == True:
+                    self.anim += 0
+                else:
+                    self.anim -= 2
             drawRadial((0, 0, 255), (self.x + 50, self.y + 50), 47, (self.anim))
-        elif self.hitrecord >= 4 and self.hitrecord <= 7:
-            self.anim += 2
-            drawRadial((0, 0, 255), (self.x + 50, self.y + 50), 47, (self.anim))
-        elif self.hitrecord >= 8 and self.hitrecord <= 11:
-            self.anim += 4
-            drawRadial((0, 0, 255), (self.x + 50, self.y + 50), 47, (self.anim))
-        elif self.hitrecord >= 12:
-            self.anim += 6
-            drawRadial((0, 0, 255), (self.x + 50, self.y + 50), 47, (self.anim))
-        else:
-            self.anim -= 2
-            drawRadial((0, 0, 255), (self.x + 50, self.y + 50), 47, (self.anim))
-        if self.anim >= 360:
+        #resets radial (never used- chainattack.display is closed when self.anim == 360)
+        elif self.anim >= 360:
             drawRadial((0, 0, 255), (self.x + 50, self.y + 50), 47, 360)
         drawImage(self.Imagedef, (self.x, self.y))
+        #user input
         if getKey("space"):
             if self.anim >= self.limit1 and self.anim <= self.limit2:
                 self.Success = True
             elif (self.anim >= 1 and self.anim <= (self.limit1 - 1)) or (self.anim >= (self.limit2 + 1) and self.anim <= 359):
                 self.Success = False
+
 
 class wFalchion():
     x = 118
@@ -1215,7 +1407,7 @@ class wFalchion():
     width = 48
     height = 48
     wpntype = "sword"
-    dmg = 300
+    dmg = 50
     Image0 = "items/m_falchion_0.png"
     Image45 = "items/m_falchion_45.png"
     Imagedefenmy = "items/m_falchion_135.png"
@@ -1254,6 +1446,8 @@ class wFriendlyWeapon():
                 rotateImage(self.Image0, self.anim, (self.x, self.y))
             elif self.anim >= 22.5 and self.anim <= 67.5:
                 rotateImage(self.Image45, self.anim - 45, (self.x, self.y))
+            elif self.anim >= 67.5 and self.anim <= 112.5:
+                rotateImage(self.Image0, self.anim, (self.x, self.y))
         if Stance == "Charge":
             rotateImage(self.Image0, 90, (self.x, self.y))
         if Stance == "Ready":
@@ -1299,101 +1493,141 @@ class wFriendlyWeapon():
 
 class wEnemyWeapon():
     weapon = wFalchion()
+    wpntype = weapon.wpntype
+    Image135 = weapon.Image135
+    Image180 = weapon.Image180
     anim = 0
     x = weapon.x
     y = weapon.y
     width = weapon.width
     height = weapon.height
+    deg = 0
     dmg = weapon.dmg
-    def update(self, Stance, x, y):
-        if Stance == "Default":
-            self.x = x - 44
-            self.y = y + 1
-            self.Image = self.weapon.Image135
-        if Stance == "Attack":
-            self.anim += 1
-            if self.anim == 2:
-                self.x = x - 26
-                self.y = y - 48
-                self.Image = self.weapon.Image90r
-            elif self.anim == 3:
-                self.x = x - 43
-                self.y = y + 1
-                self.Image = self.weapon.Image112_5
-            elif self.anim == 4:
-                self.x = x - 44
-                self.y = y + 1
-                self.Image = self.weapon.Image135
-            elif self.anim == 5:
-                self.x = x - 44
-                self.y = y + 2
-                self.Image = self.weapon.Image157_5
-            elif self.anim == 6:
-                self.x = x - 44
-                self.y = y + 24
-                self.Image = self.weapon.Image180
-            elif self.anim == 7:
-                self.x = x - 43
-                self.y = y + 47
-                self.Image = self.weapon.Image202_5
-            elif self.anim == 8:
-                self.x = x - 44
-                self.y = y + 44
-                self.Image = self.weapon.Image225
-        if Stance == "Retreat":
-            self.x = x - 44
-            self.y = y + 44
-            self.Image = self.weapon.Image225
+    def update(self, Stance, x, y, width, height):
+        self.x = x - 48
+        self.y = y
+        if self.anim >= 360:
+            self.anim = 10
+        if Stance == "Idle":
+            rotateImage(self.Image135, 0, (self.x, self.y))
+        if Stance == "Prepare":
+            self.anim -= 10
+            if self.anim <= 0 and self.anim >= -22.5:
+                rotateImage(self.Image180, self.anim, (self.x, self.y))
+            elif self.anim <= -22.5 and self.anim >= -67.5:
+                rotateImage(self.Image135, self.anim + 45, (self.x, self.y))
+            elif self.anim <= -67.5 and self.anim >= -112.5:
+                rotateImage(self.Image180, self.anim, (self.x, self.y))
         if Stance == "Charge":
-            self.x = x - 26
-            self.y = y - 48
-            self.Image = self.weapon.Image90r
-        drawImage(self.Image, (self.x, self.y))
+            rotateImage(self.Image180, -90, (self.x, self.y))
+        if Stance == "Ready":
+            rotateImage(self.Image180, -90, (self.x, self.y))
+        if Stance == "Attack":
+            self.anim += 10
+            if (self.anim >= 0 and self.anim <= 22.5) or (self.anim <= 0 and self.anim >= -22.5):
+                rotateImage(self.Image180, self.anim, (self.x, self.y))
+            elif self.anim <= -22.5 and self.anim >= -67.5:
+                rotateImage(self.Image135, self.anim + 45, (self.x, self.y))
+            elif self.anim <= -67.5 and self.anim >= -112.5:
+                rotateImage(self.Image180, self.anim, (self.x, self.y))
+            elif self.anim <= 67.5 and self.anim >= 22.5:
+                rotateImage(self.Image135, self.anim + 45, (self.x, self.y))
+            elif self.anim <= 112.5 and self.anim >= 67.5:
+                rotateImage(self.Image180, self.anim, (self.x, self.y))
+        if Stance == "NotReady":
+            self.anim -= 10
+            if (self.anim >= 0 and self.anim <= 22.5) or (self.anim <= 0 and self.anim >= -22.5):
+                rotateImage(self.Image180, self.anim, (self.x, self.y))
+            elif self.anim <= -22.5 and self.anim >= -67.5:
+                rotateImage(self.Image135, self.anim + 45, (self.x, self.y))
+            elif self.anim <= -67.5 and self.anim >= -112.5:
+                rotateImage(self.Image180, self.anim, (self.x, self.y))
+            elif self.anim <= 67.5 and self.anim >= 22.5:
+                rotateImage(self.Image135, self.anim + 45, (self.x, self.y))
+            elif self.anim <= 112.5 and self.anim >= 67.5:
+                rotateImage(self.Image180, self.anim, (self.x, self.y))
+        if Stance == "Retreat":
+            rotateImage(self.Image135, self.anim + 90, (self.x, self.y))
+        if Stance == "Reset":
+            self.anim -= 10
+            if (self.anim >= 0 and self.anim <= 22.5) or (self.anim <= 0 and self.anim >= -22.5):
+                rotateImage(self.Image180, self.anim, (self.x, self.y))
+            elif self.anim <= -22.5 and self.anim >= -67.5:
+                rotateImage(self.Image135, self.anim + 45, (self.x, self.y))
+            elif self.anim <= -67.5 and self.anim >= -112.5:
+                rotateImage(self.Image180, self.anim, (self.x, self.y))
+            elif self.anim <= 67.5 and self.anim >= 22.5:
+                rotateImage(self.Image135, self.anim + 45, (self.x, self.y))
+            elif self.anim <= 112.5 and self.anim >= 67.5:
+                rotateImage(self.Image180, self.anim, (self.x, self.y))
 
 class cBlueSpartan():
-    Stance = "Default"
+    Stance = "Idle"
     Start = ""
     Dealt = False
     x = 594
     y = 240
+    width = 30
+    height = 84
     v_x = 10
     Image = "characters/npctest.png"
     health = 800
     maxhealth = 800
     exhaustion = 0
     weapon = wEnemyWeapon()
-    armor = 5
+    armor = 0
     def bdraw(self):
-        if self.Stance == "Default":
+        if self.Stance == "Idle":
             self.x = 594
             self.y = 240
             Image = "characters/npctest.png"
-            self.weapon.update(self.Stance, self.x, self.y)
+            self.weapon.update(self.Stance, self.x, self.y, self.width, self.height)
         for i in range(int(self.health * 100 / self.maxhealth)):
             pygame.draw.line(screen, (0, 255, 0), (i + 494, 409), (i + 494, 422))
         drawImage(self.Image, (self.x, self.y))
     def bmove(self):
         if self.Start == "Start":
-            if self.Stance == "Attack":
-                 self.weapon.update(self.Stance, self.x, self.y)
-                 if self.weapon.anim == 10:
-                     self.Stance = "Retreat"
-                     self.weapon.anim = 0
+            #if wpntype == "melee":
+            #skill sequence
+            if self.Stance == "Skill":
+                 self.weapon.update(self.Stance, self.x, self.y, self.width, self.height)
+            #normal attack sequence
+            elif self.Stance == "Charge":
+                self.x -= self.v_x
+                self.weapon.update(self.Stance, self.x, self.y, self.width, self.height)
+                if self.x <= 200:
+                    self.Stance = "Ready"
+            elif self.Stance == "Ready":
+                 self.x = self.x
+                 self.y = self.y
+                 self.weapon.update(self.Stance, self.x, self.y, self.width, self.height)
+            elif self.Stance == "Attack":
+                 self.weapon.update(self.Stance, self.x, self.y, self.width, self.height)
+                 if self.weapon.anim >= 45:
                      self.Dealt = True
+                     self.Stance = "NotReady"
+            elif self.Stance == "NotReady":
+                 self.x = self.x
+                 self.y = self.y
+                 self.weapon.update(self.Stance, self.x, self.y, self.width, self.height)
+                 if self.weapon.anim <= -90:
+                     self.Stance = "Ready"
             elif self.Stance == "Retreat":
                  self.x += self.v_x
-                 self.weapon.update(self.Stance, self.x, self.y)
-                 if self.x >= 548:
-                     self.x = 548
-                     self.Stance = "Default"
-                     self.Start = "Finish"
+                 self.weapon.update(self.Stance, self.x, self.y, self.width, self.height)
+                 if self.x >= 594:
+                     self.x = 594
+                     self.Stance = "Reset"
+            elif self.Stance == "Reset":
+                 self.weapon.update(self.Stance, self.x, self.y, self.width, self.height)
+                 if self.weapon.anim <= -45:
+                      self.Stance = "Idle"
+                      self.Start = "Finish"
             else:
-                 self.Stance = "Charge"
-                 self.x -= self.v_x
-                 self.weapon.update(self.Stance, self.x, self.y)
-                 if self.x <= 116:
-                     self.Stance = "Attack"
-
+                self.Stance = "Prepare"
+                self.weapon.update(self.Stance, self.x, self.y, self.width, self.height)
+                if self.weapon.anim <= -90:
+                    self.Stance = "Charge"
 
 if __name__ == '__main__':
     main()
